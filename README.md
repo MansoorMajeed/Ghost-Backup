@@ -1,4 +1,7 @@
-# Ghost Backup
+# WIP, DO NOT USE: Ghost Backup
+
+
+> WARNING! I am vibing with this. Do not use.
 
 A Docker-based backup solution for [Ghost Docker](https://github.com/TryGhost/ghost-docker) deployments. Uses [Restic](https://restic.net/) for encrypted, deduplicated backups to cloud storage.
 
