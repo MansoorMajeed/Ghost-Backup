@@ -154,6 +154,60 @@ check_content_directory() {
     return 0
 }
 
+# Check available disk space for staging
+check_disk_space() {
+    log "Checking disk space..."
+
+    # Get database size estimate (data + index size)
+    local db_size_bytes
+    db_size_bytes=$(mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" -N -e \
+        "SELECT SUM(data_length + index_length) FROM information_schema.tables WHERE table_schema = '$MYSQL_DATABASE'" 2>/dev/null || echo "0")
+
+    # If we couldn't get size, use a default estimate
+    if [[ -z "$db_size_bytes" ]] || [[ "$db_size_bytes" == "NULL" ]]; then
+        db_size_bytes=104857600  # 100 MB default
+    fi
+
+    # SQL dump is typically 1.5-2x the data size due to SQL syntax overhead
+    # Use 2x as safety margin
+    local required_bytes=$((db_size_bytes * 2))
+
+    # Add buffer for ActivityPub if present
+    if [[ "${BACKUP_ACTIVITYPUB:-false}" == "true" ]]; then
+        local ap_size_bytes
+        ap_size_bytes=$(mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" -N -e \
+            "SELECT SUM(data_length + index_length) FROM information_schema.tables WHERE table_schema = 'activitypub'" 2>/dev/null || echo "0")
+        if [[ -n "$ap_size_bytes" ]] && [[ "$ap_size_bytes" != "NULL" ]]; then
+            required_bytes=$((required_bytes + ap_size_bytes * 2))
+        fi
+    fi
+
+    # Add 100MB overhead
+    required_bytes=$((required_bytes + 104857600))
+
+    # Get available space in /tmp (where staging happens)
+    local available_bytes
+    available_bytes=$(df -B1 /tmp 2>/dev/null | tail -1 | awk '{print $4}')
+
+    # Convert to human readable
+    local required_human available_human
+    required_human=$(numfmt --to=iec-i --suffix=B "$required_bytes" 2>/dev/null || echo "${required_bytes} bytes")
+    available_human=$(numfmt --to=iec-i --suffix=B "$available_bytes" 2>/dev/null || echo "${available_bytes} bytes")
+
+    log "Estimated space required for MySQL dump: $required_human"
+    log "Available space in /tmp: $available_human"
+
+    if [[ "$available_bytes" -lt "$required_bytes" ]]; then
+        add_error "Insufficient disk space for backup staging"
+        add_error "Required: $required_human, Available: $available_human"
+        add_error "Increase container /tmp space or reduce database size"
+        return 1
+    fi
+
+    log_success "Sufficient disk space available"
+    return 0
+}
+
 # Check restic repository
 check_restic_repository() {
     log "Checking Restic repository..."
@@ -220,6 +274,7 @@ main() {
     check_environment || ((failed++))
     check_database || ((failed++))
     check_content_directory || ((failed++))
+    check_disk_space || ((failed++))
     check_restic_repository || ((failed++))
 
     echo ""

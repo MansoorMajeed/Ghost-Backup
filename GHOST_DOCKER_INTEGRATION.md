@@ -49,26 +49,40 @@ Add this service at the end of the services section (before `volumes:`):
 Add this section at the end of the file:
 
 ```bash
-# Backup configuration
+# ═══════════════════════════════════════════════════════════════════
+# Backup Configuration
+# ═══════════════════════════════════════════════════════════════════
 # Enable backups by adding 'backup' to COMPOSE_PROFILES
 # Example: COMPOSE_PROFILES=backup or COMPOSE_PROFILES=backup,analytics
 
 # Restic repository URL (required for backups)
-# S3: s3:s3.amazonaws.com/bucket-name/path
-# B2: b2:bucket-name:path
-# S3-compatible: s3:https://s3.wasabisys.com/bucket/path
-# RESTIC_REPOSITORY=s3:s3.amazonaws.com/my-bucket/ghost-backups
+# The path after the bucket is the subdirectory for your backups
+#
+# AWS S3:
+#   RESTIC_REPOSITORY=s3:s3.amazonaws.com/bucket-name/ghost-backups
+#   RESTIC_REPOSITORY=s3:s3.eu-west-1.amazonaws.com/bucket/prod/ghost
+#
+# Backblaze B2:
+#   RESTIC_REPOSITORY=b2:bucket-name:ghost-backups
+#   RESTIC_REPOSITORY=b2:my-backups:sites/ghost/prod
+#
+# S3-compatible (Wasabi, MinIO, Cloudflare R2):
+#   RESTIC_REPOSITORY=s3:https://s3.wasabisys.com/bucket/ghost
+#   RESTIC_REPOSITORY=s3:https://minio.example.com/backups/ghost
+#
+# RESTIC_REPOSITORY=
 
 # Repository encryption password (required, use a strong password!)
-# RESTIC_PASSWORD=your-secure-password-here
+# WARNING: If you lose this password, your backups cannot be recovered!
+# RESTIC_PASSWORD=
 
 # AWS S3 credentials
-# AWS_ACCESS_KEY_ID=AKIA...
-# AWS_SECRET_ACCESS_KEY=...
+# AWS_ACCESS_KEY_ID=
+# AWS_SECRET_ACCESS_KEY=
 
-# Backblaze B2 credentials
-# B2_ACCOUNT_ID=...
-# B2_ACCOUNT_KEY=...
+# Backblaze B2 credentials (use instead of AWS credentials for B2)
+# B2_ACCOUNT_ID=
+# B2_ACCOUNT_KEY=
 
 # Backup schedule (cron format, default: 3 AM daily)
 # BACKUP_SCHEDULE=0 3 * * *
@@ -80,7 +94,7 @@ Add this section at the end of the file:
 # BACKUP_KEEP_YEARLY=2
 
 # Health check URL (optional, pinged on backup success/failure)
-# Supports healthchecks.io, Uptime Kuma, etc.
+# Supports healthchecks.io, Uptime Kuma, or any URL that accepts GET requests
 # BACKUP_HEALTHCHECK_URL=https://hc-ping.com/your-uuid
 ```
 

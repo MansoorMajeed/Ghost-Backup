@@ -9,6 +9,7 @@ RUN apk add --no-cache \
     mysql-client \
     bash \
     curl \
+    coreutils \
     tzdata
 
 COPY entrypoint.sh /entrypoint.sh
