@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Status
+
+**⚠️ WORK IN PROGRESS - DO NOT USE IN PRODUCTION**
+
+This project is currently under active development and should not be used in production environments.
+
 ## Project Overview
 
 Ghost Backup is a Docker-based backup solution for [Ghost Docker](https://github.com/TryGhost/ghost-docker) deployments. It uses Restic for encrypted, deduplicated backups to cloud storage (S3, Backblaze B2, or S3-compatible providers).
@@ -37,15 +43,28 @@ Ghost Backup is a Docker-based backup solution for [Ghost Docker](https://github
 
 ### How Backups Work
 
-1. **Staging**: MySQL database is dumped to `/tmp/backup-staging/`
+1. **Staging**: MySQL databases are dumped to `/tmp/backup-staging/`
+   - `ghost` database (always)
+   - `activitypub` database (if detected and accessible)
 2. **Backup**: Restic backs up staging dir + content dir, deduplicating at upload time
 3. **Cleanup**: Staging directory is removed, retention policy is applied
+
+### ActivityPub Support
+
+Ghost Backup automatically detects and backs up the ActivityPub database if present:
+
+- **Detection**: During validation (validate.sh:104-111), the script checks if the `activitypub` database exists and is accessible
+- **Backup**: If detected, the ActivityPub database is dumped to `activitypub.sql` (backup.sh:188-193)
+- **Non-blocking**: If ActivityPub database dump fails, the backup continues with just the Ghost database
+- **Restore**: The restore process includes ActivityPub SQL if it was backed up
+
+This happens automatically without any configuration - the presence of the database is sufficient.
 
 ## File Structure
 
 ```
 ghost-backup/
-├── Dockerfile                # Alpine + restic + mysql-client + coreutils
+├── Dockerfile                # Alpine 3.21 + restic + mysql-client + bash + curl + coreutils + tzdata
 ├── entrypoint.sh             # Command dispatch + cron scheduler
 ├── scripts/
 │   ├── validate.sh           # Startup validation
@@ -100,7 +119,7 @@ docker run --rm ghost-backup help
 - `BACKUP_KEEP_WEEKLY` - Weekly snapshots to keep (default: `4`)
 - `BACKUP_KEEP_MONTHLY` - Monthly snapshots to keep (default: `6`)
 - `BACKUP_KEEP_YEARLY` - Yearly snapshots to keep (default: `2`)
-- `BACKUP_HEALTHCHECK_URL` - URL to ping on success/failure
+- `BACKUP_HEALTHCHECK_URL` - URL to ping on success/failure (e.g., healthchecks.io or Uptime Kuma). On success, the URL is pinged as-is. On failure, `/fail` is appended to the URL (if supported by the monitoring service)
 
 ### Cloud Credentials
 - `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` - For S3
@@ -116,9 +135,9 @@ docker run --rm ghost-backup help
 
 ### Validation Flow
 1. Environment variables (required vars set)
-2. Database connectivity (can connect, database exists, has tables)
+2. Database connectivity (can connect, database exists, has tables, detect ActivityPub database)
 3. Content directory (mounted, readable, has expected structure)
-4. Disk space (enough space in /tmp for MySQL dump)
+4. Disk space (enough space in /tmp for MySQL dump, including ActivityPub if present)
 5. Restic repository (accessible, or can be initialized)
 
 ### Adding New Validation Checks
@@ -199,10 +218,11 @@ docker compose run --rm backup restore latest
 ## CI/CD
 
 The GitHub Actions workflow (`.github/workflows/docker.yml`):
-- Triggers on push to `main` and version tags (`v*`)
-- Builds multi-platform images
-- Pushes to `ghcr.io/tryghost/ghost-backup`
+- Triggers on push to `main` and version tags (`v*`), also on pull requests
+- Builds multi-platform images (linux/amd64, linux/arm64)
+- Pushes to `ghcr.io/${{ github.repository }}` (e.g., `ghcr.io/mansoorMajeed/ghost-backup`)
 - Tags: `main`, `v1.0.0`, `v1.0`, `v1`, `sha-xxxxxxx`
+- Uses GitHub Actions cache for faster builds
 
 ## Integration with ghost-docker
 
