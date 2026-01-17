@@ -78,6 +78,40 @@ import_database() {
     fi
 }
 
+restore_content() {
+    local source="$RESTORE_DIR/content"
+    local target="/data/ghost"
+    local backup="$RESTORE_DIR/content-backup"
+
+    log "Restoring content files..."
+
+    # Backup existing content (move contents, not the mount point)
+    rm -rf "$backup"
+    mkdir -p "$backup"
+
+    if ! mv "$target"/* "$target"/.[!.]* "$backup"/ 2>/dev/null; then
+        # mv returns error if no dotfiles exist, check if backup has content
+        if [[ -z "$(ls -A "$backup" 2>/dev/null)" ]] && [[ -n "$(ls -A "$target" 2>/dev/null)" ]]; then
+            log_error "Failed to backup existing content"
+            return 1
+        fi
+    fi
+
+    # Copy restored content
+    if ! cp -a "$source"/. "$target"/; then
+        log_error "Failed to copy content files, restoring backup..."
+        rm -rf "$target"/*
+        mv "$backup"/* "$backup"/.[!.]* "$target"/ 2>/dev/null || true
+        rm -rf "$backup"
+        return 1
+    fi
+
+    # Success - remove backup
+    rm -rf "$backup"
+    log_success "Content files restored"
+    return 0
+}
+
 extract_snapshot() {
     # Clean restore directory
     log "Preparing restore directory..."
@@ -134,7 +168,7 @@ show_restore_summary() {
     if [[ -d "$RESTORE_DIR/content" ]]; then
         local content_size
         content_size=$(du -sh "$RESTORE_DIR/content" | cut -f1)
-        echo "  [3] Content files (content/ - $content_size) - Manual restore required"
+        echo "  [3] Content files (content/ - $content_size)"
     fi
     echo ""
 }
@@ -213,27 +247,27 @@ main() {
         fi
     fi
 
-    # Content files instructions
+    # Content files restore
     if [[ -d "$RESTORE_DIR/content" ]]; then
         echo ""
         echo "----------------------------------------"
-        echo "CONTENT FILES"
+        echo "CONTENT FILES RESTORE"
         echo "----------------------------------------"
-        echo "Content files have been extracted to: $RESTORE_DIR/content"
+        echo "This will REPLACE all content files (images, themes, etc.)."
+        echo "Existing content will be backed up temporarily and replaced."
         echo ""
-        echo "To restore content files manually:"
-        echo ""
-        echo "  1. Stop Ghost:"
-        echo "     docker compose stop ghost"
-        echo ""
-        echo "  2. Replace content:"
-        echo "     rm -rf ./data/ghost/*"
-        echo "     cp -r ./data/restore/content/* ./data/ghost/"
-        echo "     chown -R 1000:1000 ./data/ghost"
-        echo ""
-        echo "  3. Start Ghost:"
-        echo "     docker compose start ghost"
-        echo ""
+
+        if confirm "Restore content files?"; then
+            if ! restore_content; then
+                ((restore_failed++))
+            fi
+        else
+            log "Skipped content restore"
+            echo ""
+            echo "To restore content files manually later:"
+            echo "  cp -a $RESTORE_DIR/content/. /data/ghost/"
+            echo ""
+        fi
     fi
 
     # Final summary

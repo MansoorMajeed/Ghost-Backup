@@ -39,7 +39,7 @@ Ghost Backup is a Docker-based backup solution for [Ghost Docker](https://github
 - **entrypoint.sh**: Main entrypoint that handles command dispatching and the scheduled backup loop
 - **scripts/validate.sh**: Validates environment variables, database connectivity, content directory, disk space, and restic repository access
 - **scripts/backup.sh**: Executes backups - dumps MySQL, runs restic backup, applies retention policy
-- **scripts/restore.sh**: Restores snapshots to a staging directory for manual application
+- **scripts/restore.sh**: Interactive restore - extracts snapshots, imports databases, and restores content files
 
 ### How Backups Work
 
@@ -198,7 +198,7 @@ services:
       RESTIC_REPOSITORY: /backups
       RESTIC_PASSWORD: testpassword
     volumes:
-      - ./test-content:/data/ghost:ro
+      - ./test-content:/data/ghost
       - ./test-backups:/backups
     depends_on:
       db:
@@ -231,7 +231,23 @@ The GitHub Actions workflow (`.github/workflows/docker.yml`):
 
 This container is designed to run as part of the ghost-docker stack:
 - Uses the same MySQL database (`db` service)
-- Mounts the same content volume (read-only)
+- Mounts the same content volume (read-write for restore support)
 - Enabled via `COMPOSE_PROFILES=backup`
 
 See `GHOST_DOCKER_INTEGRATION.md` for the specific changes needed in ghost-docker.
+
+### Restore Flow
+
+The interactive restore command handles database and content restoration:
+
+```
+1. Extract snapshot to /restore
+2. Show contents summary (databases, content size)
+3. Warn: "Stop Ghost before restoring" + confirm
+4. "Restore Ghost database?" [y/N]
+5. "Restore ActivityPub database?" [y/N] (if present)
+6. "Restore content files?" [y/N] (if present)
+7. Summary + "Start Ghost to pick up changes"
+```
+
+Content restore is safe - existing files are moved to `/data/ghost.bak` before restore. If restore fails, original content is automatically restored.

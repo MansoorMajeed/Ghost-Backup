@@ -257,39 +257,45 @@ docker compose logs backup
 
 ## Restore Process
 
-Restoring is intentionally manual to prevent accidents.
+The restore command provides an interactive flow that handles both database and content restoration.
 
-1. **Restore to staging area:**
-   ```bash
-   docker compose run --rm backup restore latest
-   ```
-
-2. **Stop Ghost:**
+1. **Stop Ghost first:**
    ```bash
    docker compose stop ghost
    ```
 
-3. **Import database:**
+2. **Run the restore command:**
    ```bash
-   docker compose exec -T db mysql -u root -p$DATABASE_ROOT_PASSWORD ghost < ./data/restore/ghost.sql
+   docker compose run --rm -it backup restore latest
    ```
 
-4. **Restore content (if needed):**
-   ```bash
-   rm -rf ./data/ghost/*
-   cp -r ./data/restore/content/* ./data/ghost/
-   chown -R 1000:1000 ./data/ghost
-   ```
+   The interactive restore will:
+   - Extract and display snapshot contents
+   - Ask to restore Ghost database (y/N)
+   - Ask to restore ActivityPub database if present (y/N)
+   - Ask to restore content files (y/N)
 
-5. **Start Ghost:**
+   Content restore safely backs up existing files before replacing them. If the restore fails, your original content is automatically restored.
+
+3. **Start Ghost:**
    ```bash
    docker compose start ghost
    ```
 
-6. **Clean up:**
+4. **Clean up (optional):**
    ```bash
    rm -rf ./data/restore
    ```
+
+### Restore a Specific Snapshot
+
+```bash
+# List available snapshots
+docker compose run --rm backup snapshots
+
+# Restore a specific snapshot by ID
+docker compose run --rm -it backup restore abc123
+```
 
 ## Monitoring
 
@@ -350,8 +356,8 @@ docker compose run --rm backup unlock
 
 - All data is encrypted with AES-256 before upload
 - Repository password never leaves your server
-- Content volume is mounted read-only
 - Cloud credentials are only used by the backup container
+- Content restore creates a backup before replacing files
 
 **Important:** Store your `RESTIC_PASSWORD` securely. If you lose it, your backups cannot be decrypted.
 
