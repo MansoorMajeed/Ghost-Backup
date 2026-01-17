@@ -46,8 +46,11 @@ Ghost Backup is a Docker-based backup solution for [Ghost Docker](https://github
 1. **Staging**: MySQL databases are dumped to `/tmp/backup-staging/`
    - `ghost` database (always)
    - `activitypub` database (if detected and accessible)
-2. **Backup**: Restic backs up staging dir + content dir, deduplicating at upload time
-3. **Cleanup**: Staging directory is removed, retention policy is applied
+2. **Symlink check**: Broken symlinks are detected and excluded (e.g., default theme symlinks pointing to Ghost container paths)
+3. **Backup**: Restic streams staging dir + content dir directly to cloud storage (no local repository needed)
+4. **Cleanup**: Staging directory is removed, retention policy is applied
+
+**Note**: Restic backs up directly to the remote repository (S3/B2/etc). No local backup repository is created. Only the MySQL dump requires temporary local disk space.
 
 ### ActivityPub Support
 
@@ -64,7 +67,7 @@ This happens automatically without any configuration - the presence of the datab
 
 ```
 ghost-backup/
-├── Dockerfile                # Alpine 3.21 + restic + mysql-client + bash + curl + coreutils + tzdata
+├── Dockerfile                # MySQL 8.0 base image + restic (ensures MySQL client compatibility)
 ├── entrypoint.sh             # Command dispatch + cron scheduler
 ├── scripts/
 │   ├── validate.sh           # Startup validation

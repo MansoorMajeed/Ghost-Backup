@@ -127,12 +127,22 @@ run_backup() {
     local today
     today=$(date +%Y-%m-%d)
 
+    # Find broken symlinks and build exclude list
+    local exclude_args=()
+    while IFS= read -r broken_link; do
+        if [[ -n "$broken_link" ]]; then
+            log "Excluding broken symlink: $broken_link"
+            exclude_args+=("--exclude=$broken_link")
+        fi
+    done < <(find "$CONTENT_DIR" -xtype l 2>/dev/null)
+
     if ! restic backup \
         "${backup_paths[@]}" \
         --tag ghost \
         --tag "$today" \
         --exclude-caches \
-        --one-file-system; then
+        --one-file-system \
+        "${exclude_args[@]}"; then
         log_error "Restic backup failed"
         return 1
     fi
