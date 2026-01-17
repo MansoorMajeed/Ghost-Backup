@@ -83,13 +83,23 @@ RESTIC_REPOSITORY=s3:s3.amazonaws.com/my-backups/ghost-production
 B2_ACCOUNT_ID=...
 B2_ACCOUNT_KEY=...
 
-# Format: b2:bucket-name:path/to/backups
-RESTIC_REPOSITORY=b2:my-backups:ghost/production
+# Format: b2:bucket-name:path/in/bucket
+RESTIC_REPOSITORY=b2:my-backups:ghost
 
-# Examples:
-# b2:company-backups:ghost/prod
-# b2:company-backups:ghost/staging
+# More examples (pick ONE, path organizes backups within the bucket):
+# b2:my-backups:ghost                    # Simple, single site
+# b2:my-backups:sites/ghost/prod         # Organized for multiple sites/environments
+# b2:my-backups:sites/ghost/staging
 ```
+
+To get your B2 credentials:
+1. Log in to [Backblaze B2](https://secure.backblaze.com/b2_buckets.htm)
+2. Go to **Application Keys** in the left sidebar
+3. Click **Add a New Application Key**
+4. Set the key name (e.g., "ghost-backup") and select your bucket
+5. Copy the `keyID` → `B2_ACCOUNT_ID` and `applicationKey` → `B2_ACCOUNT_KEY`
+
+> **Note:** The application key is only shown once. Save it securely.
 
 **S3-compatible (MinIO, Wasabi, Cloudflare R2, etc):**
 ```bash

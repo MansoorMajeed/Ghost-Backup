@@ -62,9 +62,9 @@ Add this section at the end of the file:
 #   RESTIC_REPOSITORY=s3:s3.amazonaws.com/bucket-name/ghost-backups
 #   RESTIC_REPOSITORY=s3:s3.eu-west-1.amazonaws.com/bucket/prod/ghost
 #
-# Backblaze B2:
-#   RESTIC_REPOSITORY=b2:bucket-name:ghost-backups
-#   RESTIC_REPOSITORY=b2:my-backups:sites/ghost/prod
+# Backblaze B2 (format: b2:bucket-name:path/in/bucket):
+#   RESTIC_REPOSITORY=b2:my-backups:ghost              # simple
+#   RESTIC_REPOSITORY=b2:my-backups:sites/ghost/prod   # organized for multiple sites
 #
 # S3-compatible (Wasabi, MinIO, Cloudflare R2):
 #   RESTIC_REPOSITORY=s3:https://s3.wasabisys.com/bucket/ghost
