@@ -307,6 +307,11 @@ main() {
     echo "  2. Clean up restore staging when done:"
     echo "     rm -rf ./data/restore"
     echo ""
+    echo "!!!! IMPORTANT !!!!"
+    echo "If Ghost has been running while you restored the database, you MUST"
+    echo "restart the ghost container or you will see random 404!!!"
+    echo "Command to restart : docker compose restart ghost"
+    log "========================================="
 
     exit $restore_failed
 }

@@ -35,6 +35,8 @@ services:
       # For Backblaze B2 (use instead of AWS creds):
       # B2_ACCOUNT_ID: ${B2_ACCOUNT_ID}
       # B2_ACCOUNT_KEY: ${B2_ACCOUNT_KEY}
+      # Health check (optional):
+      BACKUP_HEALTHCHECK_URL: ${BACKUP_HEALTHCHECK_URL:-}
     volumes:
       - ./data/ghost:/data/ghost
       - ./data/restore:/restore
@@ -56,6 +58,9 @@ RESTIC_REPOSITORY=s3:s3.amazonaws.com/your-bucket/ghost-backups
 
 # Encryption password (SAVE THIS - you need it to restore)
 RESTIC_PASSWORD=your-secure-password
+
+# Health check (optional) - get your UUID from healthchecks.io
+BACKUP_HEALTHCHECK_URL=https://hc-ping.com/your-uuid
 
 # Cloud credentials
 AWS_ACCESS_KEY_ID=your-key
@@ -126,6 +131,22 @@ docker compose run --rm backup stats
 | `BACKUP_KEEP_MONTHLY` | `6` | Monthly snapshots to keep |
 | `BACKUP_KEEP_YEARLY` | `2` | Yearly snapshots to keep |
 | `BACKUP_HEALTHCHECK_URL` | | URL to ping on success/failure |
+
+## Health Check Notifications
+
+Get notified when backups succeed or fail using [healthchecks.io](https://healthchecks.io), [Uptime Kuma](https://github.com/louislam/uptime-kuma), or any compatible service.
+
+1. Create a check at healthchecks.io (or your preferred service)
+2. Add to your `.env`:
+   ```bash
+   BACKUP_HEALTHCHECK_URL=https://hc-ping.com/your-uuid
+   ```
+
+**How it works:**
+- On successful backup: pings `https://hc-ping.com/your-uuid`
+- On failure: pings `https://hc-ping.com/your-uuid/fail`
+
+If no pings are received within your configured grace period, you'll be notified that backups have stopped.
 
 ## What Gets Backed Up
 
