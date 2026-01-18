@@ -36,7 +36,7 @@ services:
       # B2_ACCOUNT_ID: ${B2_ACCOUNT_ID}
       # B2_ACCOUNT_KEY: ${B2_ACCOUNT_KEY}
     volumes:
-      - ./data/ghost:/data/ghost:ro
+      - ./data/ghost:/data/ghost
       - ./data/restore:/restore
     depends_on:
       db:

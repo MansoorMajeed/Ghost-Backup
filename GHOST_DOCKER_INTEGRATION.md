@@ -33,7 +33,7 @@ Add this service at the end of the services section (before `volumes:`):
       BACKUP_KEEP_YEARLY: ${BACKUP_KEEP_YEARLY:-2}
       BACKUP_HEALTHCHECK_URL: ${BACKUP_HEALTHCHECK_URL:-}
     volumes:
-      - ${UPLOAD_LOCATION:-./data/ghost}:/data/ghost:ro
+      - ${UPLOAD_LOCATION:-./data/ghost}:/data/ghost
       - ./data/restore:/restore
     depends_on:
       db:
@@ -152,7 +152,7 @@ Create a `BACKUP.md` file with usage documentation. You can adapt the content fr
 +      BACKUP_KEEP_YEARLY: ${BACKUP_KEEP_YEARLY:-2}
 +      BACKUP_HEALTHCHECK_URL: ${BACKUP_HEALTHCHECK_URL:-}
 +    volumes:
-+      - ${UPLOAD_LOCATION:-./data/ghost}:/data/ghost:ro
++      - ${UPLOAD_LOCATION:-./data/ghost}:/data/ghost
 +      - ./data/restore:/restore
 +    depends_on:
 +      db:
