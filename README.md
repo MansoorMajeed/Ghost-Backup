@@ -11,6 +11,12 @@ Docker-based backup solution for [Ghost](https://ghost.org) deployments. Uses [R
 - Deduplicates data - only uploads what changed
 - Runs on a schedule (default: 3 AM daily)
 - Supports point-in-time recovery from any snapshot
+- it DOES NOT backup anything else in the directory such as the docker compose file
+
+## Important Note about .env file
+
+Make sure you backup your .env file separately to something like a password manager. This makes it easier to restore to a completely new instance. 
+
 
 ## Quick Start
 
