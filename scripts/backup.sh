@@ -6,6 +6,7 @@ set -euo pipefail
 
 readonly CONTENT_DIR="/data/ghost"
 readonly STAGING_DIR="/tmp/backup-staging"
+readonly LOCK_DIR="/tmp/ghost-backup.lock"
 readonly MYSQL_HOST="${MYSQL_HOST:-db}"
 readonly MYSQL_PORT="${MYSQL_PORT:-3306}"
 readonly MYSQL_USER="${MYSQL_USER:-ghost}"
@@ -20,6 +21,17 @@ readonly KEEP_YEARLY="${BACKUP_KEEP_YEARLY:-2}"
 # Health check URL (optional)
 readonly HEALTHCHECK_URL="${BACKUP_HEALTHCHECK_URL:-}"
 
+acquire_lock() {
+    if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] Another backup/restore operation is in progress" >&2
+        exit 1
+    fi
+}
+
+release_lock() {
+    rmdir "$LOCK_DIR" 2>/dev/null || true
+}
+
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
 }
@@ -32,6 +44,7 @@ cleanup() {
     if [[ -d "$STAGING_DIR" ]]; then
         rm -rf "$STAGING_DIR"
     fi
+    release_lock
 }
 
 trap cleanup EXIT
@@ -175,6 +188,8 @@ apply_retention() {
 }
 
 main() {
+    acquire_lock
+
     log "========================================="
     log "Ghost Backup - Starting"
     log "========================================="

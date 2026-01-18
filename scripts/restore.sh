@@ -6,10 +6,19 @@ set -euo pipefail
 
 readonly RESTORE_DIR="/restore"
 readonly SNAPSHOT_ID="${1:-}"
+readonly LOCK_DIR="/tmp/ghost-backup.lock"
 readonly MYSQL_HOST="${MYSQL_HOST:-db}"
 readonly MYSQL_PORT="${MYSQL_PORT:-3306}"
 readonly MYSQL_USER="${MYSQL_USER:-ghost}"
 readonly MYSQL_DATABASE="${MYSQL_DATABASE:-ghost}"
+
+acquire_lock() {
+    if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] Another backup/restore operation is in progress" >&2
+        exit 1
+    fi
+    trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT
+}
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
@@ -178,6 +187,8 @@ main() {
         show_snapshots
         exit 1
     fi
+
+    acquire_lock
 
     log "========================================="
     log "Ghost Backup - Restore"
