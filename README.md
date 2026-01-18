@@ -25,7 +25,7 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_HOST: db
-      MYSQL_USER: ghost
+      MYSQL_USER: ${DATABASE_USER}
       MYSQL_PASSWORD: ${DATABASE_PASSWORD}
       RESTIC_REPOSITORY: ${RESTIC_REPOSITORY}
       RESTIC_PASSWORD: ${RESTIC_PASSWORD}
@@ -45,6 +45,8 @@ services:
         condition: service_healthy
     profiles:
       - backup
+    networks:
+      - ghost_network
 ```
 
 ### 2. Add to your `.env`
