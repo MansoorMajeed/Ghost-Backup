@@ -52,6 +52,15 @@ Ghost Backup is a Docker-based backup solution for [Ghost Docker](https://github
 
 **Note**: Restic backs up directly to the remote repository (S3/B2/etc). No local backup repository is created. Only the MySQL dump requires temporary local disk space.
 
+### Lock Mechanism
+
+Backup and restore operations use a PID-based lock file (`/tmp/ghost-backup.lock`) to prevent concurrent operations:
+
+- Lock file contains the PID of the running process
+- Before acquiring, checks if the PID is still alive
+- Stale locks (from crashed processes) are automatically removed
+- Lock is released on exit via trap
+
 ### ActivityPub Support
 
 Ghost Backup automatically detects and backs up the ActivityPub database if present:
@@ -73,6 +82,9 @@ ghost-backup/
 │   ├── validate.sh           # Startup validation
 │   ├── backup.sh             # Backup execution
 │   └── restore.sh            # Restore helper
+├── docs/
+│   ├── aws-setup.md          # AWS S3 setup guide
+│   └── b2-setup.md           # Backblaze B2 setup guide
 ├── .github/
 │   └── workflows/
 │       └── docker.yml        # Build and push to ghcr.io

@@ -1,386 +1,147 @@
-# WIP, DO NOT USE: Ghost Backup
+# Ghost Backup
 
+Docker-based backup solution for [Ghost](https://ghost.org) deployments. Uses [Restic](https://restic.net/) for encrypted, deduplicated backups to S3 or Backblaze B2.
 
-> WARNING! I am vibing with this. Do not use.
+> **Note:** Work in progress. Use at your own risk.
 
-A Docker-based backup solution for [Ghost Docker](https://github.com/TryGhost/ghost-docker) deployments. Uses [Restic](https://restic.net/) for encrypted, deduplicated backups to cloud storage.
+## What It Does
 
-## Features
-
-- **Encrypted backups** - AES-256 encryption before data leaves your server
-- **Deduplication** - Only changed data is uploaded, saving storage costs
-- **Point-in-time recovery** - Restore from any backup snapshot
-- **Cloud storage support** - S3, Backblaze B2, and S3-compatible providers
-- **Automated scheduling** - Cron-based backup scheduling
-- **Retention policies** - Automatic cleanup of old backups
-- **Validation on startup** - Verifies configuration before running
-- **ActivityPub support** - Automatically detects and backs up ActivityPub database
+- Backs up your Ghost database (MySQL dump) and content files (images, themes, etc.)
+- Encrypts everything with AES-256 before uploading
+- Deduplicates data - only uploads what changed
+- Runs on a schedule (default: 3 AM daily)
+- Supports point-in-time recovery from any snapshot
 
 ## Quick Start
 
-### 1. Add backup profile to your `.env`
+### 1. Add to your `docker-compose.yml`
 
-```bash
-# Enable backup profile
-COMPOSE_PROFILES=backup
+```yaml
+services:
+  # ... your existing ghost and db services ...
 
-# Restic repository (choose one)
-RESTIC_REPOSITORY=s3:s3.amazonaws.com/your-bucket/ghost-backups
-# RESTIC_REPOSITORY=b2:your-bucket:ghost-backups
-
-# Repository password (use a strong password!)
-RESTIC_PASSWORD=your-secure-password-here
-
-# Cloud credentials (for S3)
-AWS_ACCESS_KEY_ID=your-access-key
-AWS_SECRET_ACCESS_KEY=your-secret-key
-
-# Or for Backblaze B2
-# B2_ACCOUNT_ID=your-account-id
-# B2_ACCOUNT_KEY=your-account-key
+  backup:
+    image: ghcr.io/mansoormajeed/ghost-backup:main
+    restart: unless-stopped
+    environment:
+      MYSQL_HOST: db
+      MYSQL_USER: ghost
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD}
+      RESTIC_REPOSITORY: ${RESTIC_REPOSITORY}
+      RESTIC_PASSWORD: ${RESTIC_PASSWORD}
+      # For AWS S3:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      # For Backblaze B2 (use instead of AWS creds):
+      # B2_ACCOUNT_ID: ${B2_ACCOUNT_ID}
+      # B2_ACCOUNT_KEY: ${B2_ACCOUNT_KEY}
+    volumes:
+      - ./data/ghost:/data/ghost:ro
+      - ./data/restore:/restore
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - backup
 ```
 
-### 2. Start Ghost with backups
+### 2. Add to your `.env`
+
+```bash
+# Enable backup
+COMPOSE_PROFILES=backup
+
+# Where to store backups
+RESTIC_REPOSITORY=s3:s3.amazonaws.com/your-bucket/ghost-backups
+
+# Encryption password (SAVE THIS - you need it to restore)
+RESTIC_PASSWORD=your-secure-password
+
+# Cloud credentials
+AWS_ACCESS_KEY_ID=your-key
+AWS_SECRET_ACCESS_KEY=your-secret
+```
+
+### 3. Start
 
 ```bash
 docker compose up -d
 ```
 
-The backup container will:
-1. Validate all configuration on startup
-2. Run scheduled backups (default: 3 AM daily)
-3. Apply retention policies automatically
+The backup container validates config on startup and runs backups automatically.
 
-## Configuration
+## Cloud Storage Setup
 
-### Required Variables
-
-| Variable | Description |
-|----------|-------------|
-| `RESTIC_REPOSITORY` | Restic repository URL |
-| `RESTIC_PASSWORD` | Repository encryption password |
-
-### Cloud Provider Credentials
-
-The `RESTIC_REPOSITORY` URL includes the bucket and subdirectory path. Use subdirectories to organize multiple sites or separate backups.
-
-**AWS S3:**
-```bash
-AWS_ACCESS_KEY_ID=AKIA...
-AWS_SECRET_ACCESS_KEY=...
-
-# Format: s3:s3.amazonaws.com/bucket-name/path/to/backups
-RESTIC_REPOSITORY=s3:s3.amazonaws.com/my-backups/ghost-production
-
-# Examples:
-# s3:s3.amazonaws.com/company-backups/ghost/prod     # Production site
-# s3:s3.amazonaws.com/company-backups/ghost/staging  # Staging site
-# s3:s3.eu-west-1.amazonaws.com/bucket/ghost         # EU region
-```
-
-**Backblaze B2:**
-```bash
-B2_ACCOUNT_ID=...
-B2_ACCOUNT_KEY=...
-
-# Format: b2:bucket-name:path/in/bucket
-RESTIC_REPOSITORY=b2:my-backups:ghost
-
-# More examples (pick ONE, path organizes backups within the bucket):
-# b2:my-backups:ghost                    # Simple, single site
-# b2:my-backups:sites/ghost/prod         # Organized for multiple sites/environments
-# b2:my-backups:sites/ghost/staging
-```
-
-To get your B2 credentials:
-1. Log in to [Backblaze B2](https://secure.backblaze.com/b2_buckets.htm)
-2. Go to **Application Keys** in the left sidebar
-3. Click **Add a New Application Key**
-4. Set the key name (e.g., "ghost-backup") and select your bucket
-5. Copy the `keyID` → `B2_ACCOUNT_ID` and `applicationKey` → `B2_ACCOUNT_KEY`
-
-> **Note:** The application key is only shown once. Save it securely.
-
-**S3-compatible (MinIO, Wasabi, Cloudflare R2, etc):**
-```bash
-AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
-
-# Format: s3:https://endpoint/bucket/path
-RESTIC_REPOSITORY=s3:https://s3.wasabisys.com/my-bucket/ghost
-
-# Examples:
-# s3:https://s3.us-west-1.wasabisys.com/backups/ghost    # Wasabi
-# s3:https://minio.example.com/backups/ghost              # Self-hosted MinIO
-# s3:https://<account>.r2.cloudflarestorage.com/bucket/ghost  # Cloudflare R2
-```
-
-**Local path (for testing or NAS):**
-```bash
-# Mount a volume and use local path
-RESTIC_REPOSITORY=/backups/ghost
-```
-
-### Optional Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `BACKUP_SCHEDULE` | `0 3 * * *` | Cron schedule (default: 3 AM daily) |
-| `BACKUP_KEEP_DAILY` | `7` | Daily snapshots to keep |
-| `BACKUP_KEEP_WEEKLY` | `4` | Weekly snapshots to keep |
-| `BACKUP_KEEP_MONTHLY` | `6` | Monthly snapshots to keep |
-| `BACKUP_KEEP_YEARLY` | `2` | Yearly snapshots to keep |
-| `BACKUP_HEALTHCHECK_URL` | | URL to ping on backup success/failure |
+- [AWS S3 Setup Guide](docs/aws-setup.md)
+- [Backblaze B2 Setup Guide](docs/b2-setup.md)
 
 ## Commands
 
-### Manual Backup
-
 ```bash
+# Run a backup now
 docker compose run --rm backup backup
-```
 
-### List Snapshots
-
-```bash
+# List all snapshots
 docker compose run --rm backup snapshots
-```
 
-### Restore a Snapshot
-
-```bash
-# Restore latest
-docker compose run --rm backup restore latest
+# Restore from latest backup
+docker compose run --rm -it backup restore latest
 
 # Restore specific snapshot
-docker compose run --rm backup restore abc123
-```
+docker compose run --rm -it backup restore abc123
 
-### Verify Configuration
-
-```bash
+# Check configuration
 docker compose run --rm backup verify
-```
 
-### View Repository Stats
-
-```bash
+# View repository stats
 docker compose run --rm backup stats
-```
-
-### Remove Stale Locks
-
-```bash
-docker compose run --rm backup unlock
-```
-
-## What Gets Backed Up
-
-Each backup captures a complete snapshot of your Ghost site:
-
-### Database (MySQL dump)
-
-| Database | Contents |
-|----------|----------|
-| `ghost` | Posts, pages, tags, users, settings, members, subscriptions, newsletters, email batches, API keys, integrations, webhooks |
-| `activitypub` | Followers, following, activities, actors (only if ActivityPub profile is enabled) |
-
-The database is dumped using `mysqldump --single-transaction` which creates a consistent snapshot without locking tables or interrupting your site.
-
-### Content Directory
-
-| Path | Contents |
-|------|----------|
-| `images/` | All uploaded images (post images, logos, icons, member avatars) |
-| `media/` | Uploaded video and audio files |
-| `files/` | File attachments (PDFs, documents, etc.) |
-| `themes/` | Installed themes (including customizations) |
-| `data/` | Redirects configuration (`redirects.json`) |
-| `settings/` | Routes configuration (`routes.yaml`) |
-| `public/` | Custom static files |
-
-### What is NOT Backed Up
-
-- Ghost application code (pulled from Docker image)
-- MySQL data files (we dump the database instead for portability)
-- Caddy certificates (auto-regenerated by Let's Encrypt)
-- Node modules and system files
-- **Broken symlinks** - Automatically detected and excluded (e.g., default theme symlinks like `casper` and `source` that point to paths inside the Ghost container)
-
-## How Backup Works
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  BACKUP PROCESS                                                 │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. LOCAL STAGING (requires temporary disk space)               │
-│     ├── mysqldump ghost → /tmp/backup-staging/ghost.sql        │
-│     └── mysqldump activitypub → /tmp/backup-staging/ap.sql     │
-│                                                                 │
-│  2. RESTIC BACKUP (reads content directory + staging)           │
-│     ├── Splits files into content-addressed chunks             │
-│     ├── Compares chunks against existing repository            │
-│     ├── Encrypts only NEW chunks with AES-256                  │
-│     └── Uploads only NEW chunks to cloud storage               │
-│                                                                 │
-│  3. CLEANUP                                                     │
-│     └── Removes /tmp/backup-staging                            │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**Deduplication happens at upload time**, not locally. Restic compares chunks against what's already in the cloud repository, so only changed data is uploaded.
-
-**No local repository is needed.** Restic streams data directly to your cloud storage (S3, B2, etc.). The only local disk space required is for the temporary MySQL dump in `/tmp/backup-staging`, which is deleted after the backup completes.
-
-## Disk Space Requirements
-
-The backup container needs temporary local disk space for the MySQL dump:
-
-| Component | Space Required |
-|-----------|----------------|
-| MySQL dump | ~1-2x your database size (uncompressed SQL) |
-| Staging overhead | ~100 MB |
-
-**Example:** If your Ghost database is 500 MB, ensure at least 1 GB free in the container's `/tmp` directory.
-
-The content directory is read directly (not copied), so it doesn't require additional space.
-
-### Checking Available Space
-
-The backup validates disk space on startup. If space is insufficient, you'll see an error in the logs:
-
-```bash
-docker compose logs backup
 ```
 
 ## Restore Process
 
-The restore command provides an interactive flow that handles both database and content restoration.
-
-1. **Stop Ghost first:**
+1. Stop Ghost:
    ```bash
    docker compose stop ghost
    ```
 
-2. **Run the restore command:**
+2. Run restore (interactive):
    ```bash
    docker compose run --rm -it backup restore latest
    ```
 
-   The interactive restore will:
-   - Extract and display snapshot contents
-   - Ask to restore Ghost database (y/N)
-   - Ask to restore ActivityPub database if present (y/N)
-   - Ask to restore content files (y/N)
-
-   Content restore safely backs up existing files before replacing them. If the restore fails, your original content is automatically restored.
-
-3. **Start Ghost:**
+3. Start Ghost:
    ```bash
    docker compose start ghost
    ```
 
-4. **Clean up (optional):**
-   ```bash
-   rm -rf ./data/restore
-   ```
+## Configuration
 
-### Restore a Specific Snapshot
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RESTIC_REPOSITORY` | required | Repository URL |
+| `RESTIC_PASSWORD` | required | Encryption password |
+| `BACKUP_SCHEDULE` | `0 3 * * *` | Cron schedule |
+| `BACKUP_KEEP_DAILY` | `7` | Daily snapshots to keep |
+| `BACKUP_KEEP_WEEKLY` | `4` | Weekly snapshots to keep |
+| `BACKUP_KEEP_MONTHLY` | `6` | Monthly snapshots to keep |
+| `BACKUP_KEEP_YEARLY` | `2` | Yearly snapshots to keep |
+| `BACKUP_HEALTHCHECK_URL` | | URL to ping on success/failure |
 
-```bash
-# List available snapshots
-docker compose run --rm backup snapshots
+## What Gets Backed Up
 
-# Restore a specific snapshot by ID
-docker compose run --rm -it backup restore abc123
-```
-
-## Monitoring
-
-### Health Check Integration
-
-Set `BACKUP_HEALTHCHECK_URL` to receive notifications:
-
-```bash
-# healthchecks.io
-BACKUP_HEALTHCHECK_URL=https://hc-ping.com/your-uuid
-
-# Uptime Kuma
-BACKUP_HEALTHCHECK_URL=https://uptime.example.com/api/push/xxx
-```
-
-### Logs
-
-```bash
-docker compose logs backup
-docker compose logs -f backup  # Follow logs
-```
+- **Database**: Ghost database (and ActivityPub if present)
+- **Content**: images, media, files, themes, settings
 
 ## Troubleshooting
-
-### Validation Failed
-
-Check the error message in the logs:
-
-```bash
-docker compose logs backup
-```
-
-Common issues:
-- Missing environment variables
-- Database not accessible
-- Invalid cloud credentials
-- Repository password mismatch
-
-### Backup Failed
 
 ```bash
 # Check logs
 docker compose logs backup
 
-# Run manual backup with output
-docker compose run --rm backup backup
-```
-
-### Repository Locked
-
-If a backup was interrupted, the repository may be locked:
-
-```bash
+# Remove stale restic lock
 docker compose run --rm backup unlock
-```
-
-## Security
-
-- All data is encrypted with AES-256 before upload
-- Repository password never leaves your server
-- Cloud credentials are only used by the backup container
-- Content restore creates a backup before replacing files
-
-**Important:** Store your `RESTIC_PASSWORD` securely. If you lose it, your backups cannot be decrypted.
-
-## Development
-
-### Building Locally
-
-```bash
-docker build -t ghost-backup .
-```
-
-### Running Tests
-
-```bash
-# Validate configuration
-docker compose run --rm backup verify
-
-# Test backup (dry run not supported, use a test repository)
-docker compose run --rm backup backup
 ```
 
 ## License
 
 MIT
-
-

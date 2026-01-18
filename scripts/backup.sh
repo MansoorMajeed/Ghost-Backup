@@ -6,7 +6,7 @@ set -euo pipefail
 
 readonly CONTENT_DIR="/data/ghost"
 readonly STAGING_DIR="/tmp/backup-staging"
-readonly LOCK_DIR="/tmp/ghost-backup.lock"
+readonly LOCK_FILE="/tmp/ghost-backup.lock"
 readonly MYSQL_HOST="${MYSQL_HOST:-db}"
 readonly MYSQL_PORT="${MYSQL_PORT:-3306}"
 readonly MYSQL_USER="${MYSQL_USER:-ghost}"
@@ -22,14 +22,22 @@ readonly KEEP_YEARLY="${BACKUP_KEEP_YEARLY:-2}"
 readonly HEALTHCHECK_URL="${BACKUP_HEALTHCHECK_URL:-}"
 
 acquire_lock() {
-    if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] Another backup/restore operation is in progress" >&2
-        exit 1
+    if [[ -f "$LOCK_FILE" ]]; then
+        local lock_pid
+        lock_pid=$(cat "$LOCK_FILE" 2>/dev/null)
+        if [[ -n "$lock_pid" ]] && kill -0 "$lock_pid" 2>/dev/null; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] Another backup/restore operation is in progress (PID: $lock_pid)" >&2
+            exit 1
+        fi
+        # Stale lock - process no longer running
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARN] Removing stale lock from PID $lock_pid" >&2
+        rm -f "$LOCK_FILE"
     fi
+    echo $$ > "$LOCK_FILE"
 }
 
 release_lock() {
-    rmdir "$LOCK_DIR" 2>/dev/null || true
+    rm -f "$LOCK_FILE" 2>/dev/null || true
 }
 
 log() {

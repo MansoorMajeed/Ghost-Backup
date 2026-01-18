@@ -8,7 +8,7 @@ Add this service at the end of the services section (before `volumes:`):
 
 ```yaml
   backup:
-    image: ghcr.io/tryghost/ghost-backup:1
+    image: ghcr.io/mansoormajeed/ghost-backup:main
     restart: unless-stopped
     environment:
       # Database connection (reuses existing vars)
@@ -132,7 +132,7 @@ Create a `BACKUP.md` file with usage documentation. You can adapt the content fr
      restart: no
 
 +  backup:
-+    image: ghcr.io/tryghost/ghost-backup:1
++    image: ghcr.io/mansoormajeed/ghost-backup:main
 +    restart: unless-stopped
 +    environment:
 +      MYSQL_HOST: db
